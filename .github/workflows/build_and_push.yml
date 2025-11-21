@@ -1,0 +1,45 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.91.1
+
+      - name: Build release binary
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Zip the exe
+        working-directory: target/x86_64-pc-windows-msvc/release
+        run: 7z a wwm_utils.zip *.exe > $null
+
+      - name: Set Release Tag from Cargo.toml
+        id: prep
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version\s*=' Cargo.toml | sed -E 's/version *= *"(.*)"/\1/')
+          echo "RELEASE_TAG=$version" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          owner: dest1yo
+          repo: wwm_utils
+          artifacts: target/x86_64-pc-windows-msvc/release/wwm_utils.zip
+          tag: ${{ env.RELEASE_TAG }}
+          name: "wwm_utils v${{ env.RELEASE_TAG }}"
+          draft: false
+          prerelease: false
