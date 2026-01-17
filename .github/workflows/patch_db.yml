@@ -25,7 +25,7 @@ jobs:
 
       - name: Patch db_mp with hotfix
         run: |
-          python3 db_patcher.pyz db_mp
+          ./db_patcher db_mp
 
       - name: Prepare release files
         run: |
