@@ -22,10 +22,12 @@ jobs:
         run: |
           wget -O db_mp "${{ github.event.inputs.db_mp_url }}"
           ls -lh db_mp
+          file db_mp
 
       - name: Patch db_mp with hotfix
         run: |
-          ./db_patcher db_mp
+          chmod +x wwm_cli
+          ./wwm_cli db_mp
 
       - name: Prepare release files
         run: |
