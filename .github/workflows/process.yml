@@ -59,18 +59,42 @@ jobs:
 
           # Đọc hotfix.csv
           if os.path.exists('hotfix.csv'):
-              with open('hotfix.csv', 'r', encoding='utf-8') as f:
+              print("Found hotfix.csv, processing...")
+              with open('hotfix.csv', 'r', encoding='utf-8-sig') as f:
+                  # Đọc dòng đầu tiên để debug
+                  first_line = f.readline()
+                  print(f"Header line: {repr(first_line)}")
+                  f.seek(0)
+                  
                   reader = csv.DictReader(f)
+                  # In ra tên các cột
+                  print(f"CSV columns: {reader.fieldnames}")
+                  
                   count = 0
                   for row in reader:
-                      key = row['ID'].strip().strip("'")
-                      translation = row['Translation'].strip()
-                      if key in entries:
-                          entries[key] = translation
-                          count += 1
-                          print(f"Patched: {key} -> {translation}")
+                      # Tìm cột ID với nhiều tên khả dĩ
+                      key = None
+                      for col in ['ID', 'Id', 'id', ' ID', 'ID ']:
+                          if col in row:
+                              key = row[col].strip().strip("'")
+                              break
+                      
+                      # Tìm cột Translation
+                      translation = None
+                      for col in ['Translation', 'translation', ' Translation', 'Translation ']:
+                          if col in row:
+                              translation = row[col].strip()
+                              break
+                      
+                      if key and translation:
+                          if key in entries:
+                              entries[key] = translation
+                              count += 1
+                              print(f"Patched: {key} -> {translation}")
+                          else:
+                              print(f"Warning: Key not found: {key}")
                       else:
-                          print(f"Warning: Key not found: {key}")
+                          print(f"Warning: Missing key or translation in row: {row}")
               
               print(f"\nTotal patched: {count} entries")
               
