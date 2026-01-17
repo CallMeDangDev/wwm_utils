@@ -26,13 +26,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Build wwm_utils
-        run: cargo build --release
+      - name: Make wwm_utils executable
+        run: chmod +x wwm_utils
 
       - name: Download words_map file
         run: |
@@ -47,7 +42,7 @@ jobs:
 
       - name: Unpack words_map
         run: |
-          ./target/release/wwm_utils translate_words_map_zh_cn
+          ./wwm_utils translate_words_map_zh_cn
 
       - name: Apply hotfix to entries.json
         if: github.event.inputs.hotfix_file != ''
@@ -88,7 +83,7 @@ jobs:
 
       - name: Pack words_map
         run: |
-          ./target/release/wwm_utils output/translate_words_map_zh_cn
+          ./wwm_utils output/translate_words_map_zh_cn
 
       - name: Prepare release files
         run: |
