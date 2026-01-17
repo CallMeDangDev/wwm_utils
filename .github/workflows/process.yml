@@ -32,6 +32,7 @@ jobs:
       - name: Download words_map file
         run: |
           wget -O translate_words_map_zh_cn "${{ github.event.inputs.words_map }}"
+          mv translate_words_map_zh_cn translate_words_map_en
 
       - name: Download and extract hotfix file
         if: github.event.inputs.hotfix_file != ''
@@ -42,7 +43,7 @@ jobs:
 
       - name: Unpack words_map
         run: |
-          ./wwm_utils translate_words_map_zh_cn
+          ./wwm_utils translate_words_map_en
 
       - name: Apply hotfix to entries.json
         if: github.event.inputs.hotfix_file != ''
@@ -53,19 +54,34 @@ jobs:
           import os
 
           # Đọc entries.json
-          entries_path = "output/translate_words_map_zh_cn/entries.json"
+          entries_path = "output/translate_words_map_en/entries.json"
           with open(entries_path, 'r', encoding='utf-8') as f:
               entries = json.load(f)
 
           # Đọc hotfix.csv
           if os.path.exists('hotfix.csv'):
               print("Found hotfix.csv, processing...")
+              
+              # Đếm tổng số dòng trong CSV
+              with open('hotfix.csv', 'r', encoding='utf-8-sig') as f:
+                  total_rows = sum(1 for _ in csv.DictReader(f))
+              
+              print(f"Total entries in hotfix: {total_rows}")
+              
               with open('hotfix.csv', 'r', encoding='utf-8-sig') as f:
                   reader = csv.DictReader(f)
                   
                   count = 0
-                  not_found = []
+                  not_found = 0
+                  processed = 0
+                  
                   for row in reader:
+                      processed += 1
+                      
+                      # In progress mỗi 100,000 entries
+                      if processed % 100000 == 0:
+                          print(f"Progress: {processed}/{total_rows} entries processed...")
+                      
                       # Lấy ID từ CSV
                       key_str = row.get('ID', '').strip().strip("'\"")
                       translation = row.get('Translation', '').strip()
@@ -88,22 +104,15 @@ jobs:
                           if key in entries:
                               entries[key] = translation
                               count += 1
-                              if signed_value < 0:
-                                  print(f"✓ Patched (converted {signed_value}): {key} -> {translation}")
-                              else:
-                                  print(f"✓ Patched: {key} -> {translation}")
                           else:
-                              not_found.append((key_str, key if signed_value < 0 else None))
-                              if signed_value < 0:
-                                  print(f"✗ Key not found: {signed_value} (tried as {key})")
-                              else:
-                                  print(f"✗ Key not found: {key}")
-                      except ValueError as e:
-                          print(f"⚠ Invalid ID format: {key_str}")
+                              not_found += 1
+                      except ValueError:
+                          pass
               
               print(f"\n{'='*60}")
-              print(f"Total patched: {count} entries")
-              print(f"Not found: {len(not_found)} entries")
+              print(f"Processed: {processed} entries")
+              print(f"Patched: {count} entries")
+              print(f"Not found: {not_found} entries")
               
               # Ghi lại entries.json
               with open(entries_path, 'w', encoding='utf-8') as f:
@@ -114,14 +123,14 @@ jobs:
 
       - name: Pack words_map
         run: |
-          ./wwm_utils output/translate_words_map_zh_cn
+          ./wwm_utils output/translate_words_map_en
 
       - name: Prepare release files
         run: |
           mkdir -p release_files
-          cp output/translate_words_map_zh_cn/merged/translate_words_map_zh_cn release_files/
+          cp output/translate_words_map_en/merged/translate_words_map_en release_files/
           cd release_files
-          zip translate_words_map_zh_cn.zip translate_words_map_zh_cn
+          zip translate_words_map_en.zip translate_words_map_en
 
       - name: Get current date
         id: date
@@ -138,7 +147,7 @@ jobs:
             - Source: ${{ github.event.inputs.words_map }}
             - Hotfix: ${{ github.event.inputs.hotfix_file || 'None' }}
           files: |
-            release_files/translate_words_map_zh_cn
-            release_files/translate_words_map_zh_cn.zip
+            release_files/translate_words_map_en
+            release_files/translate_words_map_en.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
