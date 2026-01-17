@@ -72,7 +72,7 @@ jobs:
                   reader = csv.DictReader(f)
                   
                   count = 0
-                  not_found = 0
+                  not_found_list = []
                   processed = 0
                   
                   for row in reader:
@@ -85,6 +85,7 @@ jobs:
                       # Lấy ID từ CSV
                       key_str = row.get('ID', '').strip().strip("'\"")
                       translation = row.get('Translation', '').strip()
+                      original_text = row.get('OriginalText', '').strip()
                       
                       if not key_str or not translation:
                           continue
@@ -105,14 +106,29 @@ jobs:
                               entries[key] = translation
                               count += 1
                           else:
-                              not_found += 1
+                              not_found_list.append({
+                                  'id': key_str,
+                                  'original': original_text,
+                                  'translation': translation
+                              })
                       except ValueError:
                           pass
               
               print(f"\n{'='*60}")
               print(f"Processed: {processed} entries")
               print(f"Patched: {count} entries")
-              print(f"Not found: {not_found} entries")
+              print(f"Not found: {len(not_found_list)} entries")
+              
+              if not_found_list:
+                  print(f"\n{'='*60}")
+                  print("Keys not found in entries.json:")
+                  print(f"{'='*60}")
+                  for item in not_found_list:
+                      print(f"ID: {item['id']}")
+                      if item['original']:
+                          print(f"  Original: {item['original']}")
+                      print(f"  Translation: {item['translation']}")
+                      print()
               
               # Ghi lại entries.json
               with open(entries_path, 'w', encoding='utf-8') as f:
