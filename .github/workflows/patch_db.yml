@@ -1,0 +1,58 @@
+name: Patch DB_MP
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_mp_url:
+        description: 'URL to download db_mp file'
+        required: true
+        type: string
+
+jobs:
+  patch:
+    name: Patch DB_MP with Hotfix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make patcher executable
+        run: chmod +x db_patcher
+
+      - name: Download db_mp file
+        run: |
+          wget -O db_mp "${{ github.event.inputs.db_mp_url }}"
+          ls -lh db_mp
+
+      - name: Patch db_mp with hotfix
+        run: |
+          ./db_patcher db_mp
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          cp db_mp release_files/
+          cd release_files
+          zip db_mp.zip db_mp
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: db-${{ steps.date.outputs.date }}
+          name: DB_MP Patched ${{ steps.date.outputs.date }}
+          body: |
+            Patched db_mp file with latest hotfix
+            
+            - Source: ${{ github.event.inputs.db_mp_url }}
+            - Hotfix: Latest from GitHub releases
+          files: |
+            release_files/db_mp
+            release_files/db_mp.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
