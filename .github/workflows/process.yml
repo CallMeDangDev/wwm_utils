@@ -1,0 +1,118 @@
+# The action to unpack a words_map file
+
+name: Process words_map file
+
+on:
+  workflow_dispatch:
+    inputs:
+      words_map:
+        description: 'URL download words_map'
+        required: true
+        default: ""
+        type: string
+      hotfix_file:
+        description: 'URL download hotfix file (Release.zip)'
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  process:
+    name: Process words_map
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build wwm_utils
+        run: cargo build --release
+
+      - name: Download words_map file
+        run: |
+          wget -O translate_words_map_zh_cn "${{ github.event.inputs.words_map }}"
+
+      - name: Download and extract hotfix file
+        if: github.event.inputs.hotfix_file != ''
+        run: |
+          wget -O Release.zip "${{ github.event.inputs.hotfix_file }}"
+          unzip Release.zip
+          ls -la
+
+      - name: Unpack words_map
+        run: |
+          ./target/release/wwm_utils translate_words_map_zh_cn
+
+      - name: Apply hotfix to entries.json
+        if: github.event.inputs.hotfix_file != ''
+        run: |
+          python3 << 'EOF'
+          import json
+          import csv
+          import os
+
+          # Đọc entries.json
+          entries_path = "output/translate_words_map_zh_cn/entries.json"
+          with open(entries_path, 'r', encoding='utf-8') as f:
+              entries = json.load(f)
+
+          # Đọc hotfix.csv
+          if os.path.exists('hotfix.csv'):
+              with open('hotfix.csv', 'r', encoding='utf-8') as f:
+                  reader = csv.DictReader(f)
+                  count = 0
+                  for row in reader:
+                      key = row['ID'].strip().strip("'")
+                      translation = row['Translation'].strip()
+                      if key in entries:
+                          entries[key] = translation
+                          count += 1
+                          print(f"Patched: {key} -> {translation}")
+                      else:
+                          print(f"Warning: Key not found: {key}")
+              
+              print(f"\nTotal patched: {count} entries")
+              
+              # Ghi lại entries.json
+              with open(entries_path, 'w', encoding='utf-8') as f:
+                  json.dump(entries, f, ensure_ascii=False, indent=2)
+          else:
+              print("hotfix.csv not found, skipping patch")
+          EOF
+
+      - name: Pack words_map
+        run: |
+          ./target/release/wwm_utils output/translate_words_map_zh_cn
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          cp output/translate_words_map_zh_cn/merged/translate_words_map_zh_cn release_files/
+          cd release_files
+          zip translate_words_map_zh_cn.zip translate_words_map_zh_cn
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: release-${{ steps.date.outputs.date }}
+          name: Words Map Release ${{ steps.date.outputs.date }}
+          body: |
+            Processed words_map file with hotfix applied
+            
+            - Source: ${{ github.event.inputs.words_map }}
+            - Hotfix: ${{ github.event.inputs.hotfix_file || 'None' }}
+          files: |
+            release_files/translate_words_map_zh_cn
+            release_files/translate_words_map_zh_cn.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
